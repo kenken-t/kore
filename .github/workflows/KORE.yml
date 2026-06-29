@@ -4,7 +4,6 @@ on:
     # 日本時間 0:05 に実行 (UTCでは前日の 15:05)
     - cron: '5 15 * * *'
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -20,3 +19,9 @@ jobs:
         env:
           RAKUTEN_CONFIG_JSON: ${{ secrets.RAKUTEN_CONFIG_JSON }}
         run: python KORE.py
+      - name: Keep alive commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "keep alive [skip ci]"
+          git push

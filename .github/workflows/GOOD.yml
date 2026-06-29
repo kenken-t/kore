@@ -5,7 +5,6 @@ on:
     # UTCでは前日の 16, 17, 18, 19, 20, 21, 22, 23, 当日の 0, 1 となります
     - cron: '0 16,17,18,19,20,21,22,23,0,1 * * *'
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -21,3 +20,9 @@ jobs:
         env:
           RAKUTEN_CONFIG_JSON: ${{ secrets.RAKUTEN_CONFIG_JSON }}
         run: python GOOD.py
+      - name: Keep alive commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "keep alive [skip ci]"
+          git push
