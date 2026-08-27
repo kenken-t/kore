@@ -7,6 +7,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python
@@ -16,6 +17,7 @@ jobs:
       - name: Install dependencies
         run: pip install selenium
       - name: Run script
+        timeout-minutes: 20
         env:
           RAKUTEN_CONFIG_JSON: ${{ secrets.RAKUTEN_CONFIG_JSON }}
         run: python KORE.py
@@ -24,4 +26,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git commit --allow-empty -m "keep alive [skip ci]"
-          git push
+          for i in 1 2 3 4 5; do
+            git pull --rebase && git push && exit 0
+            sleep $((RANDOM % 10 + 5))
+          done
+          echo "push failed after retries" >&2
+          exit 1
