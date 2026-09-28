@@ -25,7 +25,13 @@ jobs:
         timeout-minutes: 20
         env:
           RAKUTEN_CONFIG_JSON: ${{ secrets.RAKUTEN_CONFIG_JSON }}
-        run: python GOOD.py
+        run: |
+          # 2026/9/28 は上限に達しているため、いいねを休止する
+          if [ "$(TZ=Asia/Tokyo date +%F)" = "2026-09-28" ]; then
+            echo "本日（2026-09-28）はいいねを休止しています"
+            exit 0
+          fi
+          python GOOD.py
       - name: Keep alive commit
         run: |
           git config user.name "github-actions[bot]"
