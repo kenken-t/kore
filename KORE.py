@@ -85,8 +85,16 @@ def login():
         print("パスワードを送信しました")
 
         # ROOMに戻ってこられたらログイン成功
-        WebDriverWait(driver, 30).until(lambda d: d.current_url.startswith('https://room.rakuten.co.jp/') and '/login' not in d.current_url)
-        print("ログインしました")
+        back_to_room = lambda d: d.current_url.startswith('https://room.rakuten.co.jp/') and '/login' not in d.current_url
+        try:
+            WebDriverWait(driver, 30).until(back_to_room)
+        except TimeoutException:
+            # 楽天側のログイン後の転送画面（#/redirect）で止まることがあるので、
+            # ログイン済みの状態でROOMのログインURLを開き直して戻ってくる
+            print(f"転送で止まったため開き直します（{driver.current_url.split('#')[-1]}）")
+            driver.get('https://room.rakuten.co.jp/common/login?redirectafterlogin=/items')
+            WebDriverWait(driver, 30).until(back_to_room)
+        print(f"ログインしました: {driver.current_url}")
         return True
     except Exception as e:
         print(f"ログインエラー: {e}")
