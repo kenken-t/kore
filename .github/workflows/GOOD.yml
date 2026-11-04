@@ -18,7 +18,7 @@ jobs:
       - name: Install dependencies
         run: pip install selenium
       - name: Run script
-        timeout-minutes: 20
+        timeout-minutes: 30
         env:
           RAKUTEN_CONFIG_JSON: ${{ secrets.RAKUTEN_CONFIG_JSON }}
         run: python GOOD.py
