@@ -50,6 +50,7 @@ options = webdriver.chrome.options.Options()
 options.add_argument('--headless')
 options.add_argument('--no-sandbox')
 options.add_argument('--disable-dev-shm-usage')
+options.add_argument('--window-size=1280,1000')
 
 # ユーザーデータ（プロファイル）の指定（環境に応じて変更）
 user_data_dir = config.get("user_data_dir")
@@ -59,25 +60,64 @@ if user_data_dir and os.path.exists(user_data_dir):
 # Driverの起動（GitHub Actions では PATH が通っているため service 指定なしで動くことが多い）
 driver = webdriver.Chrome(options=options)
 
+def click_button(button_id):
+    # 言語切り替えの案内バナーがボタンに重なってクリックできないため、取り除いてから押す
+    driver.execute_script("document.querySelectorAll('r10-language-disclaimer').forEach(e => e.remove());")
+    button = driver.find_element(By.ID, button_id)
+    try:
+        button.click()
+    except WebDriverException:
+        driver.execute_script("arguments[0].click();", button)
+
 def login():
     try:
         print("ログインを開始します...")
         driver.get('https://room.rakuten.co.jp/common/login?redirectafterlogin=/items')
-        time.sleep(3)
 
         # ユーザー名入力
-        username_field = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, 'username')))
+        username_field = WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.NAME, 'username')))
+        username_field.clear()
         username_field.send_keys(config["email"])
-        driver.find_element(By.ID, 'cta001').click()
-        time.sleep(2)
+        time.sleep(1)
+        click_button('cta001')
 
         # パスワード入力
-        password_field = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, 'password')))
-        password_field.send_keys(config["password"])
-        driver.find_element(By.ID, 'cta011').click()
-        time.sleep(5)
+        # パスワード欄は Selenium から「非表示」と判定されることがあるので、パスワード画面の「次へ」が出るのを待つ
+        WebDriverWait(driver, 15).until(lambda d: d.find_element(By.ID, 'cta011').is_displayed())
+        password_field = driver.find_element(By.NAME, 'password')
+        try:
+            password_field.clear()
+            password_field.send_keys(config["password"])
+        except WebDriverException:
+            driver.execute_script(
+                "const el = arguments[0];"
+                "Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, arguments[1]);"
+                "el.dispatchEvent(new Event('input', {bubbles: true}));"
+                "el.dispatchEvent(new Event('change', {bubbles: true}));",
+                password_field, config["password"])
+        time.sleep(1)
+        click_button('cta011')
+        print("パスワードを送信しました")
+
+        # ROOMに戻ってこられたらログイン成功
+        back_to_room = lambda d: d.current_url.startswith('https://room.rakuten.co.jp/') and '/login' not in d.current_url
+        try:
+            WebDriverWait(driver, 30).until(back_to_room)
+        except TimeoutException:
+            # 楽天側のログイン後の転送画面（#/redirect）で止まることがあるので、
+            # ログイン済みの状態でROOMのログインURLを開き直して戻ってくる
+            print(f"転送で止まったため開き直します（{driver.current_url.split('#')[-1]}）")
+            driver.get('https://room.rakuten.co.jp/common/login?redirectafterlogin=/items')
+            WebDriverWait(driver, 30).until(back_to_room)
+        print(f"ログインしました: {driver.current_url}")
+        return True
     except Exception as e:
         print(f"ログインエラー: {e}")
+        print(f"現在のURL: {driver.current_url}")
+        # 原因調査用に、画面上の入力欄とボタンの状態を出しておく
+        for el in driver.find_elements(By.CSS_SELECTOR, 'input, [role="button"]'):
+            print(f"  {el.tag_name} id={el.get_attribute('id')} name={el.get_attribute('name')} type={el.get_attribute('type')} 表示={el.is_displayed()} 文字={el.text[:20]!r}")
+        return False
 
 def search():
     try:
@@ -125,7 +165,9 @@ def like(set_num):
 if __name__ == '__main__':
     print(f"--- 実行開始: {dt.now()} ---")
     try:
-        login()
+        if not login():
+            # ログインできないまま「成功」扱いにならないよう、失敗で終わらせる
+            sys.exit(1)
         search()
         target = random.randint(90, 100)
         result = like(target)
